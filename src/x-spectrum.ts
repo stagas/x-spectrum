@@ -1,4 +1,5 @@
-import { attrs, mixter, props, shadow, state } from 'mixter'
+import $ from 'sigl'
+
 import { dbToFloat, fftLogIndexer } from 'webaudio-tools'
 
 const style = /*css*/ `
@@ -24,74 +25,62 @@ canvas {
   image-rendering: pixelated;
 }`
 
-export class SpectrumElement extends mixter(
-  HTMLElement,
-  shadow(`<style>${style}</style><canvas></canvas>`),
-  attrs(
-    class {
-      autoResize = false
+export interface SpectrumElement extends $.Element<SpectrumElement> {}
 
-      width = 150
-      height = 50
-      pixelRatio = window.devicePixelRatio
+@$.element() export class SpectrumElement extends HTMLElement {
+  root = $.shadow(this, `<style>${style}</style><canvas></canvas>`)
 
-      minFreq = 62
-      maxFreq = 21000
+  @$.attr() autoResize = false
 
-      speed = 0.03
-      gravity = 0.05
+  @$.attr() width = 150
+  @$.attr() height = 50
+  @$.attr() pixelRatio = window.devicePixelRatio
 
-      background = '#123'
-      color = '#1ff'
-    }
-  ),
-  props(
-    class {
-      analyser?: AnalyserNode
-      /** @private */
-      analyserData?: Float32Array
-      /** @private */
-      getFFTLogIndex?: (normal: number) => number
-      /** @private */
-      gradient?: CanvasGradient
-      /** @private */
-      peakPos?: Float32Array
-      /** @private */
-      peakVel?: Float32Array
-      /** @private */
-      screen?: {
-        canvas: HTMLCanvasElement
-        ctx: CanvasRenderingContext2D
-      }
-      gradientColors = {
-        '0.3': '#424242',
-        '1': '#2f2f2f',
-      }
-      /** @private */
-      draw?: () => void
-      /** @private */
-      loop?: {
-        start(): void
-        stop(): void
-      }
-      /**
-       * Start displaying the spectrum.
-       */
-      start() {
-        this.loop?.start()
-      }
-      /**
-       * Stop displaying the spectrum.
-       */
-      stop() {
-        this.loop?.stop()
-      }
-    }
-  ),
-  state<SpectrumElement>(({ $, effect, reduce }) => {
+  @$.attr() minFreq = 62
+  @$.attr() maxFreq = 21000
+
+  @$.attr() speed = 0.03
+  @$.attr() gravity = 0.05
+
+  @$.attr() background = '#123'
+  @$.attr() color = '#1ff'
+
+  analyser?: AnalyserNode
+  analyserData?: Float32Array
+  getFFTLogIndex?: (normal: number) => number
+  gradient?: CanvasGradient
+  peakPos?: Float32Array
+  peakVel?: Float32Array
+  screen?: {
+    canvas: HTMLCanvasElement
+    ctx: CanvasRenderingContext2D
+  }
+  gradientColors = {
+    '0.3': '#424242',
+    '1': '#2f2f2f',
+  }
+  draw?: () => void
+  loop?: {
+    start(): void
+    stop(): void
+  }
+  /**
+   * Start displaying the spectrum.
+   */
+  start() {
+    this.loop?.start()
+  }
+  /**
+   * Stop displaying the spectrum.
+   */
+  stop() {
+    this.loop?.stop()
+  }
+
+  mounted($: this['$']) {
     let animFrame: any
 
-    $.screen = reduce(({ root }) => {
+    $.screen = $.reduce(({ root }) => {
       const canvas = root.querySelector('canvas')!
       const ctx = canvas.getContext('2d', {
         alpha: false,
@@ -100,7 +89,7 @@ export class SpectrumElement extends mixter(
       return { canvas, ctx }
     })
 
-    effect(({ background, screen: { canvas, ctx }, width, height, pixelRatio }) => {
+    $.effect(({ background, screen: { canvas, ctx }, width, height, pixelRatio }) => {
       const w = width * pixelRatio | 0
       const h = height * pixelRatio | 0
       if (w !== canvas.width || h !== canvas.height) {
@@ -111,11 +100,13 @@ export class SpectrumElement extends mixter(
         ctx.fillStyle = background
         ctx.fillRect(0, 0, canvas.width, canvas.height)
       }
-      $.peakPos ??= new Float32Array(canvas.width).fill(canvas.height)
-      $.peakVel ??= new Float32Array(canvas.width)
+      $.mutate(() => {
+        $.peakPos ??= new Float32Array(canvas.width).fill(canvas.height)
+        $.peakVel ??= new Float32Array(canvas.width)
+      })
     })
 
-    $.gradient = reduce(({ screen: { canvas, ctx }, gradientColors }) => {
+    $.gradient = $.reduce(({ screen: { canvas, ctx }, gradientColors }) => {
       const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height)
       for (const [key, value] of Object.entries(gradientColors)) {
         gradient.addColorStop(+key, value)
@@ -124,7 +115,7 @@ export class SpectrumElement extends mixter(
       return gradient
     })
 
-    $.draw = reduce(({
+    $.draw = $.reduce(({
       analyser,
       analyserData,
       background,
@@ -173,6 +164,9 @@ export class SpectrumElement extends mixter(
           peakPos[i] = peak
           peakVel[i] += gravity
 
+          // prevents flickering when near silence
+          if (peakPos[i] > canvas.height - 1) continue
+
           ctx.fillStyle = gradient
           ctx.fillRect(i, top | 0, w, h | 0)
 
@@ -187,9 +181,9 @@ export class SpectrumElement extends mixter(
       }
     )
 
-    $.analyserData = reduce(({ analyser }) => new Float32Array(analyser.frequencyBinCount))
+    $.analyserData = $.reduce(({ analyser }) => new Float32Array(analyser.frequencyBinCount))
 
-    $.getFFTLogIndex = reduce(({ analyser, minFreq, maxFreq }) =>
+    $.getFFTLogIndex = $.reduce(({ analyser, minFreq, maxFreq }) =>
       fftLogIndexer(
         minFreq,
         maxFreq,
@@ -198,7 +192,7 @@ export class SpectrumElement extends mixter(
       )
     )
 
-    $.loop = reduce(({ draw }) => ({
+    $.loop = $.reduce(({ draw }) => ({
       start() {
         animFrame = requestAnimationFrame(draw)
       },
@@ -207,9 +201,9 @@ export class SpectrumElement extends mixter(
       },
     }))
 
-    effect(({ loop }) => {
+    $.effect(({ loop }) => {
       loop.start()
       return () => loop.stop()
     })
-  })
-) {}
+  }
+}

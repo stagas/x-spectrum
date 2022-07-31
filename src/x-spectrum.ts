@@ -27,7 +27,8 @@ canvas {
 
 export interface SpectrumElement extends $.Element<SpectrumElement> {}
 
-@$.element() export class SpectrumElement extends HTMLElement {
+@$.element()
+export class SpectrumElement extends HTMLElement {
   root = $.shadow(this, `<style>${style}</style><canvas></canvas>`)
 
   @$.attr() autoResize = false
